@@ -1,5 +1,5 @@
 (executables
- (names alternating mod3 div7 alternating_socket traffic vending suffix)
+ (names alternating mod3 div7 alternating_socket traffic vending suffix tls)
  (public_names
   dfa.alternating
   dfa.mod3
@@ -7,7 +7,8 @@
   dfa.alternating_socket
   moore.traffic
   mealy.vending
-  nfa.suffix)
+  nfa.suffix
+  mealy.tls)
  (libraries lstar unix threads str)
  (flags
   (:standard -w -26))
