@@ -26,7 +26,11 @@
    (rocq-core (>= 9.1.0))
    rocq-prover
    rocq-stdlib
-   rocq-runtime))
+   rocq-runtime
+   mirage-crypto
+   cstruct
+   ppx_cstruct
+   x509))
 
 (package
  (name lstar)
