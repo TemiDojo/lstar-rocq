@@ -11,8 +11,7 @@ module Messages = struct
     ; session_id: bytes
     ; cipher_suites: CipherSuite.t list
     ; compression_methods: int list
-    ; extensions: bytes
-    }
+    ; extensions: bytes }
 
   let encode_extensions (exts : (int * bytes) list) : bytes =
     let buf = Buffer.create 64 in

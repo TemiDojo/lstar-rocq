@@ -916,7 +916,7 @@ module LstarLearner (T : DFATEACHER) = struct
 
   include Impl
 
-  let lstar () : int T.D.t = Impl.lstar()
+  let lstar () : int T.D.t = Impl.lstar ()
 end
 
 module MooreLstarLearner (T : MOORETEACHER) = struct
@@ -935,7 +935,7 @@ module MooreLstarLearner (T : MOORETEACHER) = struct
 
   include Impl
 
-  let mlstar () : int T.M.t = Impl.mlstar () 
+  let mlstar () : int T.M.t = Impl.mlstar ()
 end
 
 module MealyLstarLearner (T : MEALYTEACHER) = struct

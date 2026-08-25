@@ -40,9 +40,10 @@
  (wrapped false)
  (flags
   (:standard -w -20))
- (libraries unix
-            mirage-crypto
-            mirage-crypto-pk
-            mirage-crypto-rng
-            x509
-            cstruct))
+ (libraries
+  unix
+  mirage-crypto
+  mirage-crypto-pk
+  mirage-crypto-rng
+  x509
+  cstruct))

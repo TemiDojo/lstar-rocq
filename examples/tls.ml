@@ -59,54 +59,13 @@ module S = struct
   let string_of_str s = String.concat "" (List.map string_of_t s)
 end
 
-(** output alphabet: the light state *)
+(** output alphabet *)
 module O = struct
   type t = string
 
   let string_of_t s = s
 
   let t_of_string s : (t, string) Datatypes.result = Ok s
-
-  (* type t = *)
-  (*   | SERVER_HELLO *)
-  (*   | CERTIFICATE *)
-  (*   | SERVER_KEY_EXCHANGE *)
-  (*   | CERTIFICATE_REQUEST *)
-  (*   | SERVER_HELLO_DONE *)
-  (*   | CHANGE_CIPHER_SPEC *)
-  (*   | FINISHED *)
-  (**)
-  (* let string_of_t = function *)
-  (*   | SERVER_HELLO -> *)
-  (*       "SERVER_HELLO" *)
-  (*   | CERTIFICATE -> *)
-  (*       "CERTIFICATE" *)
-  (*   | SERVER_KEY_EXCHANGE -> *)
-  (*       "SERVER_KEY_EXCHANGE" *)
-  (*   | CERTIFICATE_REQUEST -> *)
-  (*       "CERTIFICATE_REQUEST" *)
-  (*   | SERVER_HELLO_DONE -> *)
-  (*       "SERVER_HELLO_DONE" *)
-  (*   | CHANGE_CIPHER_SPEC -> *)
-  (*       "CHANGE_CIPHER_SPEC" *)
-  (*   | FINISHED -> *)
-  (*       "FINISHED" *)
-  (**)
-  (* let t_of_string : string -> (t, string) Datatypes.result = function *)
-  (*   | "SERVER_HELLO" -> *)
-  (*       Ok SERVER_HELLO *)
-  (*   | "CERTIFICATE" -> *)
-  (*       Ok CERTIFICATE *)
-  (*   | "SERVER_KEY_EXCHANGE" -> *)
-  (*       Ok SERVER_KEY_EXCHANGE *)
-  (*   | "CERTFICATE_REQUEST" -> *)
-  (*       Ok CERTIFICATE_REQUEST *)
-  (*   | "SERVER_HELLO_DONE" -> *)
-  (*       Ok SERVER_HELLO_DONE *)
-  (*   | "CHANGE_CIPHER_SPEC" -> *)
-  (*       Ok CHANGE_CIPHER_SPEC *)
-  (*   | "FINISHED" -> *)
-  (*       Ok FINISHED *)
 
   let eq_dec x y = x = y
 
@@ -132,6 +91,7 @@ module Teacher : MEALYTEACHER with module S = S and module O = O = struct
     let config = TLSConfig.{host= "127.0.0.1"; port= 4433; timeout_ms= 100.0} in
     let sul = TLSSUL.create config in
     TLSSUL.pre sul ;
+    sul.tls_state.open_ssl_bug <- true;
     let result =
       try
         List.iter
@@ -169,14 +129,11 @@ module Teacher : MEALYTEACHER with module S = S and module O = O = struct
               let prefix = List.rev rprefix in
               let mealy_out = M.last_output m hd tl in
               let spec_out = output_lang prefix a in
-              Printf.printf "here1" ;
+              (* Printf.printf "Depth=%d\n %!" depth; *)
               if mealy_out <> spec_out then (
-                Printf.printf "here2 %s \n" mealy_out ;
-                Printf.printf "here3 %s \n" spec_out ;
                 Some s
               ) else
                 let next_gen = List.map (fun c -> s @ [c]) S.enum in
-                Printf.printf "here2" ;
                 find_counter_example (depth + 1) (rest @ next_gen) )
     in
     find_counter_example 0 (List.map (fun c -> [c]) S.enum)
@@ -208,12 +165,14 @@ let dedup l =
   |> List.rev
 
 let print_results name m n =
-  Printf.printf "\n=== %s ===\n" name ;
+  Printf.printf "\n=== %s ===\n%!" name ;
   print_endline "Mealy machine found" ;
   MP.print_mealy m ;
   Printf.printf "DOT file at %s\n" (MP.to_dot ~name:(name ^ "_vending") m) ;
   ()
 
-let () = print_results "Mealy-L*" (LstarLearner.mlstar ()) 3
-(* print_results "Mealy-KV" (KVLearner.mkv ()) 3 ; *)
-(* print_results "Mealy- TTT" (TTTLearner.mttt ()) 3 *)
+let () = 
+        Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
+        print_results "Mealy-L*" (LstarLearner.mlstar ()) 3
+ (*print_results "Mealy-KV" (KVLearner.mkv ()) 3*)
+ (*print_results "Mealy- TTT" (TTTLearner.mttt ()) 3 *)

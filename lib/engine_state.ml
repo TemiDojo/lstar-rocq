@@ -29,7 +29,8 @@ module TLS = struct
     ; mutable server_mac_key: bytes
     ; mutable client_enc_key: bytes
     ; mutable server_enc_key: bytes
-    ; mutable server_certificate: bytes option }
+    ; mutable server_certificate: bytes option
+    ; mutable open_ssl_bug: bool }
 
   let create () =
     { version= ProtocolVersion.TLS12
@@ -48,7 +49,8 @@ module TLS = struct
     ; server_mac_key= Bytes.create 0
     ; client_enc_key= Bytes.create 0
     ; server_enc_key= Bytes.create 0
-    ; server_certificate= None }
+    ; server_certificate= None
+    ; open_ssl_bug= false }
 
   let reset state =
     state.version <- ProtocolVersion.TLS12 ;
@@ -103,30 +105,43 @@ module TLS = struct
       ; version= state.version
       ; fragment= hs_msg }
 
-  (* Builds a ClientKeyExchange record and always produces something
-     wire-valid, regardless of what state the connection is actually in --
-     this must never fail, because for mapping the SERVER's state machine
-     the client can't refuse to send a message just because it's missing
-     the "correct" inputs (e.g. this arriving out of order, with no
-     captured certificate yet). Single symbol, no separate "garbage"
-     variant: the fallback behavior IS the behavior.
-       - If a real server certificate is known: RSA-encrypt the real PMS
-         under it, exactly as a legitimate client would (this is what
-         happens on the normal, in-order path).
-       - Otherwise: send `garbage_len` random bytes in place of the
-         encrypted PMS. Still wire-format-valid (correct 2-byte length
-         prefix), content the server cannot possibly decrypt correctly --
-         itself a useful probe of out-of-order/malformed-input handling.
-     Key-block derivation is attempted opportunistically whenever a
-     cipher suite is already known (e.g. ServerHello arrived but
-     Certificate didn't), but is committed to `state` only if every
-     derivation step succeeds -- a partial failure can never leave
-     `cipher_params` set while enc/mac keys are still empty, which would
-     otherwise crash a LATER encrypted step (AES key of length 0). If
-     nothing can be derived, cipher_params is simply left as-is;
-     RecordProtection already treats `cipher_params = None` as
-     "send/receive as plaintext", so nothing downstream can crash from
-     this either. *)
+  let derive_keys_from_master_secret state (master_secret : bytes) =
+    match state.cipher_suite with
+    | Some cs -> (
+      try
+        let params = CipherParams.of_suite cs in
+        let kb_len = CipherParams.key_block_len params in
+        let key_block =
+          Crypto.compute_key_expansion master_secret state.server_random
+            state.client_random kb_len
+        in
+        let off = ref 0 in
+        let take n =
+          let b = Bytes.sub key_block !off n in
+          off := !off + n ;
+          b
+        in
+        let client_mac_key = take params.mac_key_len in
+        let server_mac_key = take params.mac_key_len in
+        let client_enc_key = take params.enc_key_len in
+        let server_enc_key = take params.enc_key_len in
+        state.master_secret <- master_secret ;
+        state.cipher_params <- Some params ;
+        state.client_mac_key <- client_mac_key ;
+        state.server_mac_key <- server_mac_key ;
+        state.client_enc_key <- client_enc_key ;
+        state.server_enc_key <- server_enc_key
+      with e ->
+        Printf.eprintf "derive_keys failed: %s\n%!" (Printexc.to_string e) )
+    | None ->
+        ()
+
+  let derive_keys_from_pms state (pms : bytes) =
+    let master_secret =
+      Crypto.compute_master_secret pms state.client_random state.server_random
+    in
+    derive_keys_from_master_secret state master_secret
+
   let build_client_key_exchange ?(garbage_len = 256) state =
     let encrypted_pms =
       match state.server_certificate with
@@ -144,45 +159,30 @@ module TLS = struct
       Messages.encode_handshake_record HandshakeType.ClientKeyExchange payload
     in
     record_transcript state hs_msg ;
-    ( match state.cipher_suite with
-    | Some cs -> (
-      try
-        let params = CipherParams.of_suite cs in
-        let master_secret =
-          Crypto.compute_master_secret state.pre_master_secret
-            state.client_random state.server_random
-        in
-        let kb_len = CipherParams.key_block_len params in
-        let key_block =
-          Crypto.compute_key_expansion master_secret state.server_random
-            state.client_random kb_len
-        in
-        let off = ref 0 in
-        let take n =
-          let b = Bytes.sub key_block !off n in
-          off := !off + n ;
-          b
-        in
-        let client_mac_key = take params.mac_key_len in
-        let server_mac_key = take params.mac_key_len in
-        let client_enc_key = take params.enc_key_len in
-        let server_enc_key = take params.enc_key_len in
-        (* only commit once every step above has succeeded *)
-        state.master_secret <- master_secret ;
-        state.cipher_params <- Some params ;
-        state.client_mac_key <- client_mac_key ;
-        state.server_mac_key <- server_mac_key ;
-        state.client_enc_key <- client_enc_key ;
-        state.server_enc_key <- server_enc_key
-      with _ -> () (* leave state untouched; treated as unencrypted below *) )
+    ( match state.cipher_params with
     | None ->
-        () ) ;
+        derive_keys_from_pms state state.pre_master_secret
+    | Some _ ->
+        if state.open_ssl_bug then begin
+          state.master_secret <-
+            Crypto.compute_master_secret state.pre_master_secret
+              state.client_random state.server_random
+        end ) ;
     Record.
       { content_type= ContentType.Handshake
       ; version= state.version
       ; fragment= hs_msg }
 
   let build_change_cipher_spec (state : state) =
+    ( match state.cipher_params with
+    | None ->
+        if state.open_ssl_bug then begin
+          let empty_ms = Bytes.create 0 in
+          derive_keys_from_master_secret state empty_ms
+        end else
+          ()
+    | Some _ ->
+        () ) ;
     Record.
       { content_type= ContentType.ChangeCipherSpec
       ; version= state.version

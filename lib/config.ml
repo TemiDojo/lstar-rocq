@@ -21,9 +21,11 @@ module TLSSUL = struct
   type t =
     { config: TLSConfig.t
     ; tls_state: TLS.state
-    ; mutable socket: Unix.file_descr option }
+    ; mutable socket: Unix.file_descr option
+    ; mutable read_buffer: bytes }
 
-  let create config = {config; tls_state= TLS.create (); socket= None}
+  let create config =
+    {config; tls_state= TLS.create (); socket= None; read_buffer= Bytes.create 0}
 
   let connect t =
     let inet_addr = Unix.inet_addr_of_string t.config.host in
@@ -38,12 +40,13 @@ module TLSSUL = struct
       Printf.eprintf "connect() failed: %s\n%!" (Unix.error_message err)
 
   let disconnect t =
-    match t.socket with
+    ( match t.socket with
     | Some s ->
         (try Unix.close s with _ -> ()) ;
         t.socket <- None
     | None ->
-        ()
+        () ) ;
+    t.read_buffer <- Bytes.create 0
 
   let pre t = disconnect t ; TLS.reset t.tls_state ; connect t
 
@@ -71,27 +74,51 @@ module TLSSUL = struct
     | None ->
         "CLOSED"
     | Some s -> (
-        let read_fds, _, _ =
-          Unix.select [s] [] [] (t.config.timeout_ms /. 1000.0)
-        in
-        if read_fds = [] then
-          "EMPTY"
-        else
-          let buf = Bytes.create 4096 in
-          try
+        let buf = Bytes.create 4096 in
+        let closed = ref false in
+        let rec drain acc first =
+          let wait =
+            if first then
+              t.config.timeout_ms /. 1000.0
+            else
+              0.05
+          in
+          let read_fds, _, _ = Unix.select [s] [] [] wait in
+          if read_fds = [] then
+            acc
+          else
             let len = Unix.recv s buf 0 4096 [] in
-            if len = 0 then
-              "CLOSED"
+            if len = 0 then (
+              closed := true ;
+              acc
+            ) else
+              drain (Bytes.cat acc (Bytes.sub buf 0 len)) false
+        in
+        try
+          let new_bytes = drain (Bytes.create 0) true in
+          if
+            !closed
+            && Bytes.length new_bytes = 0
+            && Bytes.length t.read_buffer = 0
+          then
+            "CLOSED"
+          else
+            let combined = Bytes.cat t.read_buffer new_bytes in
+            if Bytes.length combined = 0 then
+              "EMPTY"
             else
               let stream =
-                BinaryStream.of_cstruct (Cstruct.of_bytes (Bytes.sub buf 0 len))
+                BinaryStream.of_cstruct (Cstruct.of_bytes combined)
               in
               let responses = ref [] in
+              let last_good_pos = ref 0 in
               let rec parse_records () =
+                let before = stream.BinaryStream.pos in
                 match Record.decode stream with
                 | None ->
-                    ()
+                    stream.BinaryStream.pos <- before
                 | Some rec_item ->
+                    last_good_pos := stream.BinaryStream.pos ;
                     let content_type = rec_item.Record.content_type in
                     let plaintext =
                       if
@@ -179,11 +206,14 @@ module TLSSUL = struct
                     parse_records ()
               in
               parse_records () ;
+              t.read_buffer <-
+                Bytes.sub combined !last_good_pos
+                  (Bytes.length combined - !last_good_pos) ;
               if !responses = [] then
                 "EMPTY_RESPONSE"
               else
                 String.concat ", " (List.rev !responses)
-          with _ -> "CONNECTION_ERROR" )
+        with _ -> "CONNECTION_ERROR" )
 
   let step t symbol =
     try
@@ -241,9 +271,9 @@ module TLSSUL = struct
     | e ->
         (* Catch-all so no symbol can ever bring down the whole learner
            process, even from a bug we didn't anticipate. *)
-        "INTERNAL_ERROR(" ^ Printexc.to_string e ^ ")"
+        (*"INTERNAL_ERROR(" ^ Printexc.to_string e ^ ")"*)
+        "CLOSED"
 end
-
 
 let init_and_seed_rng () =
   (* 1. Read 32 raw bytes from /dev/urandom *)
@@ -257,54 +287,3 @@ let init_and_seed_rng () =
   let generator = create ~seed:seed_cstruct (module Fortuna) in
   (* 4. Set as default *)
   set_default_generator generator
-
-let commence sequence =
-  init_and_seed_rng () ;
-  Printf.printf "===========================================\n" ;
-  Printf.printf " Testing TLSSUL execution against server   \n" ;
-  Printf.printf "===========================================\n\n" ;
-
-  let config =
-    TLSConfig.{host= "127.0.0.1"; port= 4433; timeout_ms= 2000.0}
-  in
-  let sul = TLSSUL.create config in
-  Printf.printf "[1] Connecting to server at %s:%d...\n" config.host config.port ;
-  TLSSUL.pre sul ;
-  (* let sequence = *)
-  (*   [  *)
-  (*   "APPLICATION_DATA" *)
-  (*   ; "CLOSE_NOTIFY" ] *)
-  (* in *)
-  (* let sequence = *)
-  (*   [ "CLIENT_HELLO" *)
-  (*   ; "CLIENT_KEY_EXCHANGE" *)
-  (*   ; "CHANGE_CIPHER_SPEC" *)
-  (*   ; "FINISHED" *)
-  (*   ; "EMPTY_APPLICATION_DATA" *)
-  (*   ; "APPLICATION_DATA" *)
-  (*   ; "CLOSE_NOTIFY" ] *)
-  (* in *)
-  (* let sequence = *)
-  (*   [ "CLIENT_KEY_EXCHANGE" *)
-  (*   ; "CHANGE_CIPHER_SPEC" *)
-  (*   ; "FINISHED" *)
-  (*   ; "EMPTY_APPLICATION_DATA" *)
-  (*   ; "APPLICATION_DATA" *)
-  (*   ; "CLOSE_NOTIFY" ] *)
-  (* in *)
-  (* List.iter *)
-  (*   (fun symbol -> *)
-  (*     Printf.printf " -> Sending: %-25s " symbol ; *)
-  (*     let response = TLSSUL.step sul symbol in *)
-  (*     Printf.printf "Received: %s\n" response ) *)
-  (*   sequence ; *)
-  let last_response =
-  List.fold_left
-    (fun _prev symbol ->
-      let response = TLSSUL.step sul symbol in
-      response)
-    "" sequence
-in
-  last_response
-
-
