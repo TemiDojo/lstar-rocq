@@ -12,6 +12,7 @@ module S = struct
     | CHANGE_CIPHER_SPEC
     | FINISHED
     | APPLICATION_DATA
+    | HEARTBEAT
     | EMPTY_APPLICATION_DATA
 
   let string_of_t = function
@@ -27,8 +28,12 @@ module S = struct
         "APPLICATION_DATA"
     | EMPTY_APPLICATION_DATA ->
         "EMPTY_APPLICATION_DATA"
+    | HEARTBEAT ->
+        "HEARTBEAT"
 
   let t_of_string : string -> (t, string) Datatypes.result = function
+    | "HEARTBEAT" ->
+        Ok HEARTBEAT
     | "CLIENT_HELLO" ->
         Ok CLIENT_HELLO
     | "CLIENT_KEY_EXCHANGE" ->
@@ -52,6 +57,7 @@ module S = struct
     ; CHANGE_CIPHER_SPEC
     ; FINISHED
     ; APPLICATION_DATA
+    ; HEARTBEAT
     ; EMPTY_APPLICATION_DATA ]
 
   type str = t list
@@ -91,7 +97,6 @@ module Teacher : MEALYTEACHER with module S = S and module O = O = struct
     let config = TLSConfig.{host= "127.0.0.1"; port= 4433; timeout_ms= 100.0} in
     let sul = TLSSUL.create config in
     TLSSUL.pre sul ;
-    sul.tls_state.open_ssl_bug <- true;
     let result =
       try
         List.iter

@@ -1,5 +1,3 @@
-[@@@warning "-26-27-32-33-34-35-37-69"]
-
 open Tls_types
 open Ciphersuite
 open Crypto
@@ -29,8 +27,7 @@ module TLS = struct
     ; mutable server_mac_key: bytes
     ; mutable client_enc_key: bytes
     ; mutable server_enc_key: bytes
-    ; mutable server_certificate: bytes option
-    ; mutable open_ssl_bug: bool }
+    ; mutable server_certificate: bytes option }
 
   let create () =
     { version= ProtocolVersion.TLS12
@@ -49,8 +46,7 @@ module TLS = struct
     ; server_mac_key= Bytes.create 0
     ; client_enc_key= Bytes.create 0
     ; server_enc_key= Bytes.create 0
-    ; server_certificate= None
-    ; open_ssl_bug= false }
+    ; server_certificate= None }
 
   let reset state =
     state.version <- ProtocolVersion.TLS12 ;
@@ -162,27 +158,13 @@ module TLS = struct
     ( match state.cipher_params with
     | None ->
         derive_keys_from_pms state state.pre_master_secret
-    | Some _ ->
-        if state.open_ssl_bug then begin
-          state.master_secret <-
-            Crypto.compute_master_secret state.pre_master_secret
-              state.client_random state.server_random
-        end ) ;
+    | Some _ -> ()) ;
     Record.
       { content_type= ContentType.Handshake
       ; version= state.version
       ; fragment= hs_msg }
 
   let build_change_cipher_spec (state : state) =
-    ( match state.cipher_params with
-    | None ->
-        if state.open_ssl_bug then begin
-          let empty_ms = Bytes.create 0 in
-          derive_keys_from_master_secret state empty_ms
-        end else
-          ()
-    | Some _ ->
-        () ) ;
     Record.
       { content_type= ContentType.ChangeCipherSpec
       ; version= state.version

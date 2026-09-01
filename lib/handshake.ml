@@ -1,5 +1,3 @@
-[@@@warning "-26-27-32-33-34-35-37-69"]
-
 open Tls_types
 open Utils
 open Stdlib
@@ -42,8 +40,11 @@ module Messages = struct
       algos ;
     Buffer.to_bytes buf
 
+  let heartbeat_extension () : bytes =
+    Bytes.of_string "\x02"
+
   let default_client_hello_extensions () : bytes =
-    encode_extensions [(0x000d, signature_algorithms_extension ())]
+      encode_extensions [(0x000d, signature_algorithms_extension ()); (15, heartbeat_extension ())]
 
   type server_hello =
     { version: ProtocolVersion.t

@@ -1,5 +1,3 @@
-[@@@warning "-26-27-32-33-34-35-37-69"]
-
 open Tls_types
 open Ciphersuite
 open Record
@@ -199,6 +197,8 @@ module TLSSUL = struct
                           responses := HandshakeType.to_string ht :: !responses
                         end else
                           responses := "HANDSHAKE" :: !responses
+                    | ContentType.Heartbeat ->
+                        responses := "HEARTBEAT" :: !responses
                     | ContentType.ApplicationData ->
                         responses := "APPLICATION_DATA" :: !responses
                     | ContentType.Unknown _ ->
@@ -247,6 +247,15 @@ module TLSSUL = struct
               { content_type= ContentType.ApplicationData
               ; version= t.tls_state.version
               ; fragment= payload }
+          in
+          send_record t rec_obj ; receive_responses t
+      | "HEARTBEAT" ->
+          let rec_obj =
+            Record.
+              { content_type= ContentType.Heartbeat
+              ; version= t.tls_state.version
+              ; fragment= Bytes.of_string "\x01"
+              }
           in
           send_record t rec_obj ; receive_responses t
       | "CLOSE_NOTIFY" ->

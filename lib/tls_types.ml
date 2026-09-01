@@ -1,5 +1,3 @@
-[@@@warning "-26-27-32-33-34-35-37-69"]
-
 module ProtocolVersion = struct
   type t = SSL30 | TLS10 | TLS11 | TLS12 | Unknown of int * int
 
@@ -39,6 +37,7 @@ module ContentType = struct
     | Alert
     | Handshake
     | ApplicationData
+    | Heartbeat
     | Unknown of int
 
   let to_int = function
@@ -50,6 +49,8 @@ module ContentType = struct
         22
     | ApplicationData ->
         23
+    | Heartbeat ->
+        24
     | Unknown v ->
         v
 
@@ -62,6 +63,8 @@ module ContentType = struct
         Handshake
     | 23 ->
         ApplicationData
+    | 24 ->
+        Heartbeat
     | v ->
         Unknown v
 
@@ -72,6 +75,8 @@ module ContentType = struct
         "ALERT"
     | Handshake ->
         "HANDSHAKE"
+    | Heartbeat ->
+        "HEARTBEAT"
     | ApplicationData ->
         "APPLICATION_DATA"
     | Unknown v ->
