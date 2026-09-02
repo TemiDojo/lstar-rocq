@@ -151,11 +151,11 @@ module KVLearner = MealyKVLearner (Teacher)
 module TTTLearner = MealyTTTLearner (Teacher)
 module MP = MealyPrinter (Teacher)
 
-let rec enumberate (n : int) : S.str list =
+let rec enumerate (n : int) : S.str list =
   if n <= 0 then
     [[]]
   else
-    let prev = enumberate (n - 1) in
+    let prev = enumerate (n - 1) in
     let prepend c l = List.map (fun s -> [c] @ s) l in
     [[]] @ List.concat_map (fun c -> prepend c prev) S.enum
 
