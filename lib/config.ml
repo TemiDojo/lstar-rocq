@@ -254,7 +254,7 @@ module TLSSUL = struct
             Record.
               { content_type= ContentType.Heartbeat
               ; version= t.tls_state.version
-              ; fragment= Bytes.of_string "\x01"
+              ; fragment= Bytes.of_string "\x01\x00\x04ping\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
               }
           in
           send_record t rec_obj ; receive_responses t
