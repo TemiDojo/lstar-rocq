@@ -12,6 +12,7 @@ module S = struct
     | CHANGE_CIPHER_SPEC
     | FINISHED
     | APPLICATION_DATA
+    | CERTIFICATE
     | HEARTBEAT
     | EMPTY_APPLICATION_DATA
 
@@ -20,6 +21,8 @@ module S = struct
         "CLIENT_HELLO"
     | CLIENT_KEY_EXCHANGE ->
         "CLIENT_KEY_EXCHANGE"
+    | CERTIFICATE ->
+        "CERTIFICATE"
     | CHANGE_CIPHER_SPEC ->
         "CHANGE_CIPHER_SPEC"
     | FINISHED ->
@@ -36,6 +39,8 @@ module S = struct
         Ok HEARTBEAT
     | "CLIENT_HELLO" ->
         Ok CLIENT_HELLO
+    | "CERTIFICATE" ->
+        Ok CERTIFICATE
     | "CLIENT_KEY_EXCHANGE" ->
         Ok CLIENT_KEY_EXCHANGE
     | "CHANGE_CIPHER_SPEC" ->
@@ -54,6 +59,7 @@ module S = struct
   let enum =
     [ CLIENT_HELLO
     ; CLIENT_KEY_EXCHANGE
+    ; CERTIFICATE
     ; CHANGE_CIPHER_SPEC
     ; FINISHED
     ; APPLICATION_DATA
@@ -94,7 +100,7 @@ module Teacher : MEALYTEACHER with module S = S and module O = O = struct
 
   let output_lang_live (s : S.str) (a : S.t) : O.t =
     Config.init_and_seed_rng () ;
-    let config = TLSConfig.{host= "127.0.0.1"; port= 4433; timeout_ms= 100.0} in
+    let config = TLSConfig.{host= Sys.getenv "TLS_TARGET"; port= 4433; timeout_ms= 100.0} in
     let sul = TLSSUL.create config in
     TLSSUL.pre sul ;
     let result =
@@ -173,11 +179,11 @@ let print_results name m n =
   Printf.printf "\n=== %s ===\n%!" name ;
   print_endline "Mealy machine found" ;
   MP.print_mealy m ;
-  Printf.printf "DOT file at %s\n" (MP.to_dot ~name:(name ^ "_vending") m) ;
+  Printf.printf "DOT file at %s\n" (MP.to_dot ~name:(name ^ "_tls") m) ;
   ()
 
 let () = 
         Sys.set_signal Sys.sigpipe Sys.Signal_ignore;
-        print_results "Mealy-L*" (LstarLearner.mlstar ()) 3
+        print_results "Mealy-Lstar" (LstarLearner.mlstar ()) 3
  (*print_results "Mealy-KV" (KVLearner.mkv ()) 3*)
  (*print_results "Mealy- TTT" (TTTLearner.mttt ()) 3 *)

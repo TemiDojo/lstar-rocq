@@ -170,6 +170,14 @@ module TLS = struct
       ; version= state.version
       ; fragment= Bytes.of_string "\x01" }
 
+  let build_empty_certificate (state: state) =
+    let payload = Messages.encode_handshake_record HandshakeType.Certificate (Bytes.of_string "\x00\x00\x00") in
+    record_transcript state payload ;
+    Record.
+      { content_type= ContentType.Handshake
+      ; version= state.version
+      ; fragment= payload }
+
   let build_finished state =
     let hash = get_transcript_hash state in
     let v_data =

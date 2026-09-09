@@ -232,6 +232,9 @@ module TLSSUL = struct
       | "FINISHED" ->
           let rec_obj = TLS.build_finished t.tls_state in
           send_record t rec_obj ; receive_responses t
+      | "CERTIFICATE" ->
+          let rec_obj = TLS.build_empty_certificate t.tls_state in
+          send_record t rec_obj ; receive_responses t
       | "EMPTY_APPLICATION_DATA" ->
           let rec_obj =
             Record.
@@ -254,7 +257,7 @@ module TLSSUL = struct
             Record.
               { content_type= ContentType.Heartbeat
               ; version= t.tls_state.version
-              ; fragment= Bytes.of_string "\x01\x00\x04ping\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
+              ; fragment= Bytes.of_string "\x01\x00\x01\xff\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00"
               }
           in
           send_record t rec_obj ; receive_responses t
