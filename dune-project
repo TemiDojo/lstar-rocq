@@ -23,7 +23,7 @@
  (synopsis "Formally-verified automata learning in Rocq")
  (description "Formally-verified implementations of L* and similar algorithms in Rocq")
  (depends
-   (rocq-core (>= 9.1.0))
+   (rocq-core (= 9.1.0))
    rocq-prover
    rocq-stdlib
    rocq-runtime
@@ -37,7 +37,7 @@
  (synopsis "Automata learning with lstar-rocq")
  (description "Formally-verified implementations of L* and similar algorithms")
  (depends
-   (rocq-core (>= 9.1.0))
+   (rocq-core (= 9.1.0))
    rocq-prover
    rocq-stdlib
    rocq-runtime
