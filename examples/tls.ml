@@ -126,7 +126,7 @@ module Teacher : MEALYTEACHER with module S = S and module O = O = struct
 
   let equiv_query (m : 'a M.t) : S.str option =
     let rec find_counter_example depth current_strings =
-      if depth >= int_of_float (2. ** 12.) then
+      if depth >= int_of_float (2. ** 13.) then
         None
       else
         match current_strings with
@@ -140,10 +140,9 @@ module Teacher : MEALYTEACHER with module S = S and module O = O = struct
               let prefix = List.rev rprefix in
               let mealy_out = M.last_output m hd tl in
               let spec_out = output_lang prefix a in
-              (* Printf.printf "Depth=%d\n %!" depth; *)
-              if mealy_out <> spec_out then (
+              if mealy_out <> spec_out then
                 Some s
-              ) else
+              else
                 let next_gen = List.map (fun c -> s @ [c]) S.enum in
                 find_counter_example (depth + 1) (rest @ next_gen) )
     in
