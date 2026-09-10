@@ -17,8 +17,8 @@
   Mealy
   Moore
   norm_lemmas
-  norm_dfa
   norm_moore
+  MooreDFA
   norm_mealy
   norm_nfa
   Alphabet
@@ -46,4 +46,6 @@
   mirage-crypto-pk
   mirage-crypto-rng
   x509
-  cstruct))
+  cstruct)
+ (modes native))
+>>>>>>> upstream/main

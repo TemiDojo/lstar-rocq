@@ -15,6 +15,24 @@ open Moore
 open Alphabet
 open Stdlib
 
+(** General memoization for membership queries. *)
+let memo1 (f : 'a -> 'b) : 'a -> 'b =
+  let cache : (int, ('a * 'b) list) Hashtbl.t = Hashtbl.create 4096 in
+  fun x ->
+    let h = Hashtbl.hash_param 1_000_000 1_000_000 x in
+    let bucket = try Hashtbl.find cache h with Not_found -> [] in
+    match List.assoc_opt x bucket with
+    | Some y ->
+        y
+    | None ->
+        let y = f x in
+        Hashtbl.replace cache h ((x, y) :: bucket) ;
+        y
+
+let memo2 (f : 'a -> 'b -> 'c) : 'a -> 'b -> 'c =
+  let g = memo1 (fun (x, y) -> f x y) in
+  fun x y -> g (x, y)
+
 (** Minimally Adequate Teachers *)
 
 (* Teacher for DFAs *)
@@ -906,7 +924,7 @@ module LstarLearner (T : DFATEACHER) = struct
       (struct
         module D = T.D
 
-        let member = T.member
+        let member = memo1 T.member
 
         let num_states_in_minimal = T.fuel
       end)
@@ -925,7 +943,7 @@ module MooreLstarLearner (T : MOORETEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = T.output_lang
+        let output_lang = memo1 T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -944,7 +962,7 @@ module MealyLstarLearner (T : MEALYTEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = T.output_lang
+        let output_lang = memo2 T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -964,7 +982,7 @@ module KVLearner (T : DFATEACHER) = struct
       (struct
         module D = T.D
 
-        let member = T.member
+        let member = memo1 T.member
 
         let num_states_in_minimal = T.fuel
       end)
@@ -983,7 +1001,7 @@ module MooreKVLearner (T : MOORETEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = T.output_lang
+        let output_lang = memo1 T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -1002,7 +1020,7 @@ module MealyKVLearner (T : MEALYTEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = T.output_lang
+        let output_lang = memo2 T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -1022,7 +1040,7 @@ module TTTLearner (T : DFATEACHER) = struct
       (struct
         module D = T.D
 
-        let member = T.member
+        let member = memo1 T.member
 
         let num_states_in_minimal = T.fuel
       end)
@@ -1041,7 +1059,7 @@ module MooreTTTLearner (T : MOORETEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = T.output_lang
+        let output_lang = memo1 T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -1060,7 +1078,7 @@ module MealyTTTLearner (T : MEALYTEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = T.output_lang
+        let output_lang = memo2 T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -1082,7 +1100,7 @@ module NLstarLearner (T : NFATEACHER) = struct
         module R = T.R
         module Res = R.Res
 
-        let member = T.member
+        let member = memo1 T.member
 
         let num_states_in_canonical = T.fuel
 
