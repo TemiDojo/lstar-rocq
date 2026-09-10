@@ -1,0 +1,13 @@
+services:
+  lstar-rocq:
+    build:
+      context: ./containers/lstar-rocq
+      dockerfile: Containerfile
+      args:
+        TARGET: gnutls
+  gnutls:
+    build:
+      context: ./containers/gnutls
+      dockerfile: Containerfile
+      args:
+        VERSION: "3_3_12"

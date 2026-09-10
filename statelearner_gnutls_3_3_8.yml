@@ -1,0 +1,13 @@
+services:
+  statelearner:
+    build:
+      context: ./containers/statelearner
+      dockerfile: Containerfile
+      args:
+        TARGET: gnutls
+  gnutls:
+    build:
+      context: ./containers/gnutls
+      dockerfile: Containerfile
+      args:
+        VERSION: "3_3_8"
