@@ -16,22 +16,63 @@ open Alphabet
 open Stdlib
 
 (** General memoization for membership queries. *)
-let memo1 (f : 'a -> 'b) : 'a -> 'b =
-  let cache : (int, ('a * 'b) list) Hashtbl.t = Hashtbl.create 4096 in
-  fun x ->
-    let h = Hashtbl.hash_param 1_000_000 1_000_000 x in
-    let bucket = try Hashtbl.find cache h with Not_found -> [] in
-    match List.assoc_opt x bucket with
-    | Some y ->
-        y
-    | None ->
-        let y = f x in
-        Hashtbl.replace cache h ((x, y) :: bucket) ;
-        y
+type ('k, 'v) trie =
+  {mutable value: 'v option; mutable children: ('k * ('k, 'v) trie) list}
 
-let memo2 (f : 'a -> 'b -> 'c) : 'a -> 'b -> 'c =
-  let g = memo1 (fun (x, y) -> f x y) in
-  fun x y -> g (x, y)
+let new_trie () = {value= None; children= []}
+
+let memo_calls = ref 0
+
+let memo_steps = ref 0
+
+let trie_node (root : ('k, 'v) trie) (key : 'k list) : ('k, 'v) trie =
+  incr memo_calls ;
+  let rec descend node = function
+    | [] ->
+        node
+    | c :: rest ->
+        incr memo_steps ;
+        let rec find = function
+          | [] ->
+              let n = new_trie () in
+              node.children <- (c, n) :: node.children ;
+              n
+          | (c', n) :: tl ->
+              if c' = c then
+                n
+              else
+                find tl
+        in
+        descend (find node.children) rest
+  in
+  descend root key
+
+(** Memoize a function of a word. *)
+let memo_word (f : 'k list -> 'v) : 'k list -> 'v =
+  let root = new_trie () in
+  fun key ->
+    let node = trie_node root key in
+    match node.value with
+    | Some v ->
+        v
+    | None ->
+        let v = f key in
+        node.value <- Some v ;
+        v
+
+let memo_word2 (f : 'k list -> 'a -> 'v) : 'k list -> 'a -> 'v =
+  let g =
+    memo_word (fun key ->
+        let by_symbol : ('a, 'v) Hashtbl.t = Hashtbl.create 4 in
+        fun a ->
+          match Hashtbl.find_opt by_symbol a with
+          | Some v ->
+              v
+          | None ->
+              let v = f key a in
+              Hashtbl.add by_symbol a v ; v )
+  in
+  fun key a -> (g key) a
 
 (** Minimally Adequate Teachers *)
 
@@ -924,7 +965,7 @@ module LstarLearner (T : DFATEACHER) = struct
       (struct
         module D = T.D
 
-        let member = memo1 T.member
+        let member = memo_word T.member
 
         let num_states_in_minimal = T.fuel
       end)
@@ -943,7 +984,7 @@ module MooreLstarLearner (T : MOORETEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = memo1 T.output_lang
+        let output_lang = memo_word T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -962,7 +1003,7 @@ module MealyLstarLearner (T : MEALYTEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = memo2 T.output_lang
+        let output_lang = memo_word2 T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -982,7 +1023,7 @@ module KVLearner (T : DFATEACHER) = struct
       (struct
         module D = T.D
 
-        let member = memo1 T.member
+        let member = memo_word T.member
 
         let num_states_in_minimal = T.fuel
       end)
@@ -1001,7 +1042,7 @@ module MooreKVLearner (T : MOORETEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = memo1 T.output_lang
+        let output_lang = memo_word T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -1020,7 +1061,7 @@ module MealyKVLearner (T : MEALYTEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = memo2 T.output_lang
+        let output_lang = memo_word2 T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -1040,7 +1081,7 @@ module TTTLearner (T : DFATEACHER) = struct
       (struct
         module D = T.D
 
-        let member = memo1 T.member
+        let member = memo_word T.member
 
         let num_states_in_minimal = T.fuel
       end)
@@ -1059,7 +1100,7 @@ module MooreTTTLearner (T : MOORETEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = memo1 T.output_lang
+        let output_lang = memo_word T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -1078,7 +1119,7 @@ module MealyTTTLearner (T : MEALYTEACHER) = struct
       (struct
         module M = T.M
 
-        let output_lang = memo2 T.output_lang
+        let output_lang = memo_word2 T.output_lang
 
         let num_states_in_minimal = T.fuel
       end)
@@ -1100,7 +1141,7 @@ module NLstarLearner (T : NFATEACHER) = struct
         module R = T.R
         module Res = R.Res
 
-        let member = memo1 T.member
+        let member = memo_word T.member
 
         let num_states_in_canonical = T.fuel
 
