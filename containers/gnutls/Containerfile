@@ -1,0 +1,25 @@
+FROM debian:8
+
+WORKDIR /app
+
+RUN printf 'deb http://archive.debian.org/debian/ jessie main contrib non-free\ndeb http://archive.debian.org/debian-security jessie/updates main contrib non-free\n' > /etc/apt/sources.list \
+ && apt -y update \
+ && apt -y upgrade \
+ && apt --force-yes -y install wget autoconf autopoint libtool nettle-dev autogen pkg-config libtasn1-6-dev make gperf bison texinfo
+
+# Generate a keypair with openssl
+RUN openssl req -x509 -nodes -days 365 -newkey rsa:4096 -keyout whatever.crt.key -out whatever.crt -subj '/CN=whatever'
+
+ARG VERSION
+RUN wget "https://github.com/gnutls/gnutls/archive/refs/tags/gnutls_$VERSION.tar.gz" \
+ && tar xf "gnutls_$VERSION.tar.gz" \
+ && mv "gnutls-gnutls_$VERSION" gnutls
+
+WORKDIR /app/gnutls
+
+RUN touch ChangeLog \
+ && autoreconf -fi \
+ && ./configure \
+ && make
+
+CMD ./src/gnutls-serv --port=4433 --heartbeat --http --x509certfile=/app/whatever.crt --x509keyfile=/app/whatever.crt.key

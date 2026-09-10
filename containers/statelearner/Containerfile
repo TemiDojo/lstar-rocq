@@ -1,0 +1,25 @@
+FROM debian:9
+
+WORKDIR /app
+
+RUN printf 'deb http://archive.debian.org/debian/ stretch main contrib non-free\ndeb http://archive.debian.org/debian-security stretch/updates main contrib non-free\n' > /etc/apt/sources.list \
+ && apt -y update \
+ && apt -y upgrade \
+ && apt --force-yes -y install openssl git maven openjdk-8-jdk graphviz
+
+RUN git clone --recurse-submodules https://codeberg.org/cypherpunk/statelearner
+
+WORKDIR /app/statelearner
+
+RUN mvn package shade:shade
+
+WORKDIR /app/statelearner/examples/openssl
+
+COPY server.properties .
+
+ARG TARGET
+RUN sed -i "s/HOST_PLACEHOLDER/$TARGET/g" server.properties
+
+# The sleep is to give the target time to start
+CMD sleep 5 \
+ && java -jar ../../target/stateLearner-0.0.1-SNAPSHOT.jar server.properties

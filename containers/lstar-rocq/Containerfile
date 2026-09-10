@@ -1,0 +1,30 @@
+FROM fedora:44
+
+WORKDIR /app
+
+RUN dnf upgrade -y --refresh && dnf -y install opam gmp-devel host
+
+RUN git clone 'https://github.com/temidojo/lstar-rocq'
+
+WORKDIR /app/lstar-rocq
+
+COPY opam-export.export .
+
+RUN opam init --disable-sandboxing --bare -y \
+ && opam switch create default --empty \
+ && opam switch import opam-export.export
+
+RUN eval $(opam env) \
+ && make
+
+ARG TARGET
+ENV TARGET=$TARGET
+# The sleep is to wait for the target to start.
+# This maybe isn't super robust, but depends_on in the
+# compose.yml caused the container to not start
+# when using podman.
+CMD eval $(opam env) \
+ && export TLS_TARGET="$(host "$TARGET" | head -n 1 | awk '{print $4}')" \
+ && echo "TARGET: $TLS_TARGET" \
+ && sleep 5 \
+ && dune exec mealy.tls
