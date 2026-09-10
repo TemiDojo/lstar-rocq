@@ -20,6 +20,4 @@ COPY server.properties .
 ARG TARGET
 RUN sed -i "s/HOST_PLACEHOLDER/$TARGET/g" server.properties
 
-# The sleep is to give the target time to start
-CMD sleep 5 \
- && java -jar ../../target/stateLearner-0.0.1-SNAPSHOT.jar server.properties
+CMD java -jar ../../target/stateLearner-0.0.1-SNAPSHOT.jar server.properties

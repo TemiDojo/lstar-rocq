@@ -18,12 +18,8 @@ RUN eval $(opam env) \
 
 ARG TARGET
 ENV TARGET=$TARGET
-# The sleep is to wait for the target to start.
-# This maybe isn't super robust, but depends_on in the
-# compose.yml caused the container to not start
-# when using podman.
+
 CMD eval $(opam env) \
  && export TLS_TARGET="$(host "$TARGET" | head -n 1 | awk '{print $4}')" \
  && echo "TARGET: $TLS_TARGET" \
- && sleep 5 \
  && dune exec mealy.tls

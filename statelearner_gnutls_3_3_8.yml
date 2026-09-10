@@ -5,6 +5,8 @@ services:
       dockerfile: Containerfile
       args:
         TARGET: gnutls
+    depends_on:
+    - gnutls
   gnutls:
     build:
       context: ./containers/gnutls
