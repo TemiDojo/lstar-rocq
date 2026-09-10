@@ -100,7 +100,7 @@ module Teacher : MEALYTEACHER with module S = S and module O = O = struct
 
   let output_lang_live (s : S.str) (a : S.t) : O.t =
     Config.init_and_seed_rng () ;
-    let config = TLSConfig.{host= Sys.getenv "TLS_TARGET"; port= 4433; timeout_ms= 100.0} in
+    let config = TLSConfig.{host= Sys.getenv "TLS_TARGET"; port= 4433; timeout_ms= 10.0} in
     let sul = TLSSUL.create config in
     TLSSUL.pre sul ;
     let result =
